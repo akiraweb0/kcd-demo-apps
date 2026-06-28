@@ -1,0 +1,126 @@
+# Generado por KCD Demo Agent
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notifications
+  namespace: staging
+  labels:
+    app: notifications
+    managed-by: kcd-demo-agent
+    environment: staging
+    owner: backend-team
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: notifications
+  template:
+    metadata:
+      labels:
+        app: notifications
+        environment: staging
+    spec:
+      containers:
+        - name: notifications
+          image: nginx:alpine
+          ports:
+            - containerPort: 8080
+              name: http
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "128Mi"
+              cpu: "100m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: notifications
+  namespace: staging
+  labels:
+    app: notifications
+    managed-by: kcd-demo-agent
+spec:
+  selector:
+    app: notifications
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+  type: ClusterIP
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: notifications
+  namespace: staging
+  labels:
+    app: notifications
+    managed-by: kcd-demo-agent
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: notifications
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 80
+---
+# PostgreSQL
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notifications-db
+  namespace: staging
+  labels:
+    app: notifications-db
+    managed-by: kcd-demo-agent
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: notifications-db
+  template:
+    metadata:
+      labels:
+        app: notifications-db
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          env:
+            - name: POSTGRES_DB
+              value: notifications
+            - name: POSTGRES_USER
+              value: appuser
+            - name: POSTGRES_PASSWORD
+              value: kcd-demo-pass
+          ports:
+            - containerPort: 5432
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "200m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: notifications-db
+  namespace: staging
+spec:
+  selector:
+    app: notifications-db
+  ports:
+    - port: 5432
+      targetPort: 5432
